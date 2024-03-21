@@ -7,6 +7,9 @@
 MAKE_GOAL ?= help
 .DEFAULT_GOAL := $(MAKE_GOAL)
 
+#
+# Default is QUIET operation. For verbose: make QUIET='' ${TARGETS}
+#
 QUIET := @
 
 Default_flags := \
