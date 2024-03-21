@@ -40,7 +40,7 @@ Test_output_dir := _build/test/lib
 var_with_prefix = $(value:%=$(prefix)%)
 
 
-display = $(foreach prefix, $(variable_prefixes). \
+display = $(foreach prefix, $(variable_prefixes), \
   $(info ==== $(var_with_prefix) === ) $(foreach item, \
     $(or $($(var_with_prefix)),[NONE]), \
       $(info $(bullet)$(item)) \
@@ -154,14 +154,20 @@ Dialyzer_Libraries := \
  mochiweb jsx tcp_rpc_server tcp_rpc_client amqp_client mq_series decimal meck
 
 dialyzer_OTP_files = $(Dialyzer_OTP_apps:%=$(Dialyzer_dir)/%.plt)
-Dialyzer_log_file = $(*:%=$(Dialyzer_dir)/%.log)
-Dialyzer_plt_file = $(*:%=$(Dialyzer_dir)/%.plt)
+dialyzer_log_file = $(*:%=$(Dialyzer_dir)/%.log)
+dialyzer_plt_file = $(*:%=$(Dialyzer_dir)/%.plt)
 
 dialyzer_apps = $(or \
   $(App_with_$*:%=$(Build_output_dir)/%/ebin),\
   $(*:%=$(Build_output_dir)/%/ebin))
 
 .PRECIOUS: $(Dialyzer_dir)/%.plt
+
+build_mod_name = $(notdir $(*:%.beam=%))
+build_source_file = $($(build_mod_name:%=Source_of_%))
+build_output = $(dir $@)
+
+.PRECIOUS: %.beam
 
 %.beam: $$(build_source_file)
 	$(info $(space)$(space)ERLC $^)
@@ -190,9 +196,9 @@ beams_of_application = \
   $(foreach module, $(modules_of_target),\
     $(Target_of_$(module)))
 
-?beams_of_%: $$(source_of_application)
+?beams_of_%: $$(beams_of_application)
 	$(info Build files of application $(*))
-	$(foreach prerequisite, $(of $^,[NONE]),\
+	$(foreach prerequisite, $(or $^,[NONE]),\
 	  $(info $(bullet)$(prerequisite)))
 
 source_of_application = \
@@ -201,7 +207,7 @@ source_of_application = \
 
 ?source_of_%: $$(source_of_application)
 	$(info Source files of application $(*))
-	$(foreach prerequisite, $(of $^,[NONE]),\
+	$(foreach prerequisite, $(or $^,[NONE]),\
 	  $(info $(bullet)$(prerequisite)))
 #
 # Unit tests
@@ -246,11 +252,11 @@ test_dep_eunit = $(Tests_of_$(*):%=$(Eunit_dir)/%.eunit)
 #
 # Dialyzer
 #
-#$(Dialyzer_dir)%.plt: $$(beams_of_application)
+#$(Dialyzer_dir)/%.plt: $$(beams_of_application)
 %.dialyzer: $$(beams_of_application)
 	$(QUIET)mkdir -p $(Dialyzer_dir) && dialyzer \
 	$(Dialyzer_warnings:%=-W%) \
-	--built_plt \
+	--build_plt \
 	--output $(dialyzer_log_file) \
 	--get_warnings \
 	--apps $(beams_of_application) \
@@ -280,13 +286,13 @@ Analysis_plts := \
 .PRECIOUS: $(Dialyzer_dir)/%.analysis
 
 #
-# TODO: For analysis targets, need to specify only updated PLT flies
+# TODO: For analysis targets, need to specify only updated PLT files
 #       dependent on what BEAM files were rebuilt. Not easy, as some apps
 #       depend on other apps for comprehensive analysis.
 #
 $(Dialyzer_dir)/%.analysis: $(Analysis_plts)
 	dialyzer \
-	$(Dialyzer_warnings:%--W%) \
+	$(Dialyzer_warnings:%=-W%) \
 	--no_check_plt \
 	--verbose \
 	--output $@ \
@@ -307,7 +313,7 @@ analyse: build $(Analysis_targets)
 
 .PHONY: help
 help:
-	$(info Dialyzer Makefile. Recommended using --jobs=N for highest speed. )
+	$(info Dialyzer Makefile. Recommend using --jobs=N for highest speed. )
 	$(info Use the command:)
 	$(info $(bullet)make analyse)
 	$(info to perform a full Dialyser analysis of the source code;)
@@ -316,7 +322,7 @@ help:
 	$(info $(bullet)make ?...)
 	$(info to reveal the value stored in a variable, e.g. make ?App_names)
 
-All_targets := ? help dialyser analyse $(Dialyzer_targets) $(Analysis_targets)
+All_targets := ? help dialyzer analyse $(Dialyzer_targets) $(Analysis_targets)
 
 .PHONY: help.targets
 help.targets:
